@@ -1,0 +1,94 @@
+
+1. Update Controller
+Modify your show method to calculate the average rating:
+---------------------------------------------------------
+
+use App\Models\Rating;
+
+public function show($id)
+{
+    $totalRatings = Rating::where('product_id', $id)->count();
+    $averageRating = Rating::where('product_id', $id)->avg('rating');
+    $ratingCounts = Rating::where('product_id', $id)
+        ->selectRaw('rating, COUNT(*) as count')
+        ->groupBy('rating')
+        ->pluck('count', 'rating');
+
+    $ratingsData = [];
+    for ($i = 5; $i >= 1; $i--) {
+        $ratingsData[$i] = [
+            'count' => $ratingCounts[$i] ?? 0,
+            'percent' => $totalRatings ? round(($ratingCounts[$i] ?? 0) / $totalRatings * 100, 2) : 0
+        ];
+    }
+
+    return view('product.show', compact('ratingsData', 'totalRatings', 'averageRating'));
+}
+
+
+2. Update Blade Template
+In your product/show.blade.php, add the average rating above the breakdown:
+----------------------------------------------------------------------------
+
+<div class="rating-summary">
+    <h6>{{ number_format($averageRating, 1) }} out of 5</h6>
+</div>
+
+<div class="rating-breakdown">
+    @foreach ($ratingsData as $stars => $data)
+        <div class="rating-row">
+            <span>{{ $stars }} Stars</span>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" 
+                    style="width: {{ $data['percent'] }}%;" 
+                    aria-valuenow="{{ $data['percent'] }}" 
+                    aria-valuemin="0" 
+                    aria-valuemax="100">
+                    {{ $data['percent'] }}%
+                </div>
+            </div>
+            <span>({{ $data['count'] }} votes)</span>
+        </div>
+    @endforeach
+</div>
+
+<style>
+    .rating-summary h6 {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .progress {
+        width: 70%;
+        height: 20px;
+        background: #e9ecef;
+        border-radius: 5px;
+        overflow: hidden;
+        margin: 5px 0;
+    }
+    .progress-bar {
+        background: #ffc107;
+        height: 100%;
+        text-align: center;
+        color: black;
+        font-weight: bold;
+    }
+    .rating-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+</style>
+
+
+3. Expected Output
+For a product with an average rating of 4.8 and a total of 100 ratings:
+------------------------------------------------------------------------
+
+4.8 out of 5  ⭐⭐⭐⭐⭐
+
+★★★★★ [███████████ 50%] (50 votes)
+★★★★☆ [███████ 30%] (30 votes)
+★★★☆☆ [███ 10%] (10 votes)
+★★☆☆☆ [█ 5%] (5 votes)
+★☆☆☆☆ [█ 5%] (5 votes)
